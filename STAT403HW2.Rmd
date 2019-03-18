@@ -18,6 +18,8 @@ library(VIM)
 library(stringr)
 #install.packages("dplyr")
 library(dplyr)
+#install.packages("MASS")
+library(MASS)
 ```
 
 We start by loading in the data file and finding the number of NAs in the dataset.
@@ -31,7 +33,7 @@ numNA<-sum(is.na(df))
 numNA
 
 ```
-Based on the result above, we can conclude that our response variable (cardiovascular disease) is binary; yes or no. 
+Based on the result above, we can conclude that our response variable (CCCA_121) is binary; yes or no. 
 Now, we change the column names to make it easier to understand and change all categorical variables to factors so that we can use logistic regression because our response variable is binary. 
 
 ```{r}
@@ -123,11 +125,18 @@ newdf <- newdf %>%
 Now we wish to apply logistic regression to our Repsonse Variable 
 
 ```{r}
-head(newdf)
+head(newdf$Sampling_weight)
 
-class(newdf$HeartDisease)
-mod.fit <- glm(formula =HeartDisease~., binomial(link=logit), data=newdf)
-summary(mod.fit)
+full.model <- glm(formula =HeartDisease~., binomial(link=logit), data=newdf)
+summary(full.model)
+coef(full.model)
+
+
+
+step.model <- full.model %>% stepAIC(trace = FALSE)
+coef(step.model)
+
+summary(step.model)
 
 ```
 
