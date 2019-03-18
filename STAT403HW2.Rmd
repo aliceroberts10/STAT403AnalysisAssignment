@@ -1,0 +1,134 @@
+---
+title: "STAT403HW2"
+author: "Alice Roberts"
+date: "3/17/2019"
+output: html_document
+---
+
+In this homework assignment we wish to predict the cardiovascular disease (CCCA_121) based on the data set provided. 
+
+```{r }
+#install.packages("FactoMineR")
+library(FactoMineR)
+#install.packages("mice")
+library(mice)
+#install.packages("VIM")
+library(VIM)
+#install.packages("stringr")
+library(stringr)
+#install.packages("dplyr")
+library(dplyr)
+```
+
+We start by loading in the data file and finding the number of NAs in the dataset.
+
+```{r }
+df <- read.csv("~/Desktop/Stat_403_650_890_-_Analysis_Assignment_2_-_Due_Mar_19/CCHS Data for Stat 403 650 890.csv", comment.char="#")
+head(df)
+
+#finding the total number of NAs in the Dataframe
+numNA<-sum(is.na(df))
+numNA
+
+```
+Based on the result above, we can conclude that our response variable (cardiovascular disease) is binary; yes or no. 
+Now, we change the column names to make it easier to understand and change all categorical variables to factors so that we can use logistic regression because our response variable is binary. 
+
+```{r}
+## Changing the column names of the dataframe to make it easier to understand 
+
+colnames(df) <- c("HeartDisease", "arthritis_or_rheumatism", "Age","Sex", "Marital_Status", "racialorigin", "Immigrantstatus", "education", "Total_household_income", "BMI","Physical_activity_index", "regular_medical_doctor", "smoker", "drinker", "high_blood_pressure", "diabetes", "emphysema_chronic_obstructive_pulmonary_disease", "total_fruits_vegetables","Self_perceived_stress", "Province", "Sampling_weight")
+
+head(df)
+
+#changing all of our categorical variables as factors
+
+df$HeartDisease<-as.factor(df$HeartDisease)
+df$arthritis_or_rheumatism<-as.factor(df$arthritis_or_rheumatism)
+df$Sex<-as.factor(df$Sex)
+df$Marital_Status <- as.factor(df$Marital_Status)
+df$racialorigin <- as.factor(df$racialorigin)
+df$Immigrantstatus <- as.factor(df$Immigrantstatus)
+df$education <- as.factor(df$education)
+df$Physical_activity_index <- as.factor(df$Physical_activity_index)
+df$regular_medical_doctor <- as.factor(df$regular_medical_doctor)
+df$smoker <- as.factor(df$smoker)
+df$drinker <- as.factor(df$drinker)
+df$high_blood_pressure <- as.factor(df$high_blood_pressure)
+df$diabetes <- as.factor(df$diabetes)
+df$emphysema_chronic_obstructive_pulmonary_disease <- as.factor(df$emphysema_chronic_obstructive_pulmonary_disease)
+df$Self_perceived_stress <- as.factor(df$Self_perceived_stress)
+df$Province <- as.factor(df$Province)
+# Looking at the summary for the dataframe
+summary(df)
+
+
+```
+
+
+```{r}
+#before we implement Mice for the NAs we will now reorder the dataframe so that all 
+#categorical variables are beside each other, this will help with data manipulation 
+#tutorial can be found here : https://datascienceplus.com/imputing-missing-data-with-r-mice-package/
+
+df<- df[c(1,2,4,5,6,7,8,11,12,13,14,15,16,17,19,20,3,9,10,18,21 )]
+
+## now all of our categroical variabels should be from rows 1:16
+head(df) 
+
+
+
+#First, we can explore the pattern of missing data
+aggr_plot <- aggr(df, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(data), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+
+#we are using predictive mean matching as imputation method
+tempData <- mice(df,m=5,maxit=5,meth='pmm',seed=500)
+summary(tempData)
+
+completedf <- complete(tempData,1)
+newdf<-completedf
+head(newdf)
+
+data.frame(unique(newdf$Total_household_income))
+
+```
+
+
+Now we wish to deal with Age and Income 
+```{r}
+newdf$Age <- newdf$Age %>%
+  str_replace_all("30 TO 34 YEARS", "32") %>%
+  str_replace_all("35 TO 39 YEARS", "37") %>%
+  str_replace_all("40 TO 44 YEARS", "42") %>%
+  str_replace_all("45 TO 49 YEARS", "47") %>%
+  str_replace_all("50 TO 54 YEARS", "52") %>%
+  str_replace_all("55 TO 59 YEARS", "57") %>%
+  str_replace_all("60 TO 64 YEARS", "62") 
+
+
+
+# clean Household Income data
+  # fill NAs with values from above
+newdf <- newdf %>%
+ mutate(Total_household_income = case_when(Total_household_income == "$15,000-$29,999" ~ 22000,
+                                     Total_household_income == "$30,000-$49,999" ~ 40000,
+                                     Total_household_income == "$50,000-$79,999" ~ 65000,
+                                     Total_household_income == "$80,000 OR MORE" ~ 90000,
+                                     Total_household_income == "LESS THAN 15,000" ~ 10000,
+                                     Total_household_income == "NO INCOME" ~ 0))
+
+
+```
+
+Now we wish to apply logistic regression to our Repsonse Variable 
+
+```{r}
+head(newdf)
+
+class(newdf$HeartDisease)
+mod.fit <- glm(formula =HeartDisease~., binomial(link=logit), data=newdf)
+summary(mod.fit)
+
+```
+
+
