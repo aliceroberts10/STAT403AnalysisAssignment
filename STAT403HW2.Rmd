@@ -20,6 +20,8 @@ library(stringr)
 library(dplyr)
 #install.packages("MASS")
 library(MASS)
+#install.packages("lme4")
+library(lme4)
 ```
 
 We start by loading in the data file and finding the number of NAs in the dataset.
@@ -31,7 +33,7 @@ head(df)
 #finding the total number of NAs in the Dataframe
 numNA<-sum(is.na(df))
 numNA
-
+10000-length(which(rowSums(is.na(df))==0))
 ```
 Based on the result above, we can conclude that our response variable (CCCA_121) is binary; yes or no. 
 Now, we change the column names to make it easier to understand and change all categorical variables to factors so that we can use logistic regression because our response variable is binary. 
@@ -61,6 +63,7 @@ df$diabetes <- as.factor(df$diabetes)
 df$emphysema_chronic_obstructive_pulmonary_disease <- as.factor(df$emphysema_chronic_obstructive_pulmonary_disease)
 df$Self_perceived_stress <- as.factor(df$Self_perceived_stress)
 df$Province <- as.factor(df$Province)
+
 # Looking at the summary for the dataframe
 summary(df)
 
@@ -93,10 +96,11 @@ head(newdf)
 
 data.frame(unique(newdf$Total_household_income))
 
+
 ```
 
 
-Now we wish to deal with Age and Income 
+Now we wish to deal with Age and Income, as stated in class we will choose the the middle number for the range in age and income. 
 ```{r}
 newdf$Age <- newdf$Age %>%
   str_replace_all("30 TO 34 YEARS", "32") %>%
@@ -125,9 +129,9 @@ newdf <- newdf %>%
 Now we wish to apply logistic regression to our Repsonse Variable 
 
 ```{r}
-head(newdf$Sampling_weight)
 
-full.model <- glm(formula =HeartDisease~., binomial(link=logit), data=newdf)
+newdf$Sampling_weight <- NULL 
+full.model <- glm(formula=HeartDisease~., binomial(link=logit), data=newdf)
 summary(full.model)
 coef(full.model)
 
