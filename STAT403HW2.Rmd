@@ -127,20 +127,28 @@ newdf <- newdf %>%
 ```
 
 Now we wish to apply logistic regression to our Repsonse Variable 
+Note that for the full model we do not use the weights argument for the glm because our repsonse variable is a binary response variable. 
 
 ```{r}
 
 newdf$Sampling_weight <- NULL 
-full.model <- glm(formula=HeartDisease~., binomial(link=logit), data=newdf)
-summary(full.model)
-coef(full.model)
+head(newdf)
 
 
+empty.mod <- glm(formula = HeartDisease ~ 1, family = binomial(link = logit), data = newdf)
+full.mod <- glm(formula = HeartDisease ~ ., family = binomial(link = logit), data = newdf)
 
-step.model <- full.model %>% stepAIC(trace = FALSE)
-coef(step.model)
+## Forward Selection 
 
-summary(step.model)
+forw.sel <- step(object = empty.mod, scope = list(upper = full.mod), direction = "forward", k = log(nrow(newdf)), trace = TRUE)
+
+anova(forw.sel)
+
+##Backward Selection 
+ 
+back.sel <- step(object = full.mod, scope = list(lower = empty.mod), direction = "backward", k = log(nrow(newdf)), trace = TRUE)
+
+anova(back.sel)
 
 ```
 
