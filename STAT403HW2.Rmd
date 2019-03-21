@@ -5,7 +5,7 @@ date: "3/17/2019"
 output: html_document
 ---
 
-In this homework assignment we wish to predict the cardiovascular disease (CCCA_121) based on the data set provided. 
+## Entire R code for project is  below: 
 
 ```{r }
 #install.packages("FactoMineR")
@@ -22,6 +22,9 @@ library(dplyr)
 library(MASS)
 #install.packages("lme4")
 library(lme4)
+#install.packages("glmnet")
+library(glmnet)
+library(car)
 ```
 
 We start by loading in the data file and finding the number of NAs in the dataset.
@@ -33,6 +36,7 @@ head(df)
 #finding the total number of NAs in the Dataframe
 numNA<-sum(is.na(df))
 numNA
+##finding the total number of rows with NA 
 10000-length(which(rowSums(is.na(df))==0))
 ```
 Based on the result above, we can conclude that our response variable (CCCA_121) is binary; yes or no. 
@@ -84,9 +88,9 @@ head(df)
 
 
 #First, we can explore the pattern of missing data
-aggr_plot <- aggr(df, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(data), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+aggr_plot <- aggr(df, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(data), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"), main="plot of NA pattern")
 
-#we are using predictive mean matching as imputation method
+#we are using predictive mean matching as the imputation method for MICE
 tempData <- mice(df,m=5,maxit=5,meth='pmm',seed=500)
 summary(tempData)
 
@@ -140,9 +144,11 @@ full.mod <- glm(formula = HeartDisease ~ ., family = binomial(link = logit), dat
 
 ## Forward Selection 
 
+
 forw.sel <- step(object = empty.mod, scope = list(upper = full.mod), direction = "forward", k = log(nrow(newdf)), trace = TRUE)
 
 anova(forw.sel)
+
 
 ##Backward Selection 
  
@@ -150,6 +156,135 @@ back.sel <- step(object = full.mod, scope = list(lower = empty.mod), direction =
 
 anova(back.sel)
 
+
 ```
+
+
+
+```{r}
+
+
+## LASSO 
+yy <- as.matrix(newdf[,1])
+xx <- as.matrix(newdf[,2:20])
+
+
+x_train <- model.matrix( ~ .-1, newdf[,2:20])
+
+
+lm = cv.glmnet(x=x_train,y = as.factor(newdf$HeartDisease), intercept=FALSE ,family =   "binomial", alpha=1, nfolds=7)
+best_lambda <- lm$lambda[which.min(lm$cvm)]
+
+# Default plot method for cv.lambda() produces CV errors +/- 1 SE at each lambda.
+plot(lm)
+# Print out coefficients at optimal lambda
+coef(lm)
+
+##finding the probabilities associated with each row(person)
+predict.las <- predict(lm, newx = x_train, type ="response")
+
+plot(predict.las, type="p", main = "Plot of Predictions for heart disease per person",xlab="row/person", ylab="probability of heart disease")
+
+
+##calculating the prediciton accuracy
+mean(rep(0, length(newdf$HeartDisease)) == ifelse(newdf$HeartDisease == "NO", 0, 1))
+
+
+```
+
+
+
+
+
+
+In this homework assignment we wish to predict the cardiovascular disease (CCCA_121) based on the data set provided. 
+
+
+## 1) Describe the response variable. Is it continuous / categorical / binary? What does its data type imply about the modeling method that is likely to work best?
+
+CCAA_121 (Heart Disease) is our response variable and it is binary (yes or no).
+
+We should use a logistic regression model because we have a binary response variable.
+
+## 2) Describe the other variables. Which are continuous? Fixed effects? Random effects? Are there any variables that are NOT explanatory or a response? (e.g. IDs, weights)
+Most of the other variables provided are categorical variables, besides age, total house income, BMI, total fruit and vegetable consumption and sampling weights. Age and total house income are discrete variables, and the other numerical variables are continous. 
+
+We know immediately that the sampling wieghts are not an explanatory variable so we exclude it from the variable selection LASSO. 
+
+Based on our variable selection technique LASSO, we see that we only need to include arthritis, sex, marital status, eduction, smoker, drinker, highblood presure, diabetes, emphysemapulmonarydisease, province, age, income and BMI in our logistic regression model. 
+
+Thus the other variables not listed above will be the non explanatory variables.
+
+## 3) Describe the missingness pattern.	Are there any missing values? Which variables? Are the missing values randomly assigned, or are is there some observable pattern? What are you going to do about the missing data?
+```{r}
+#finding the total number of NAs in the Dataframe
+numNA<-sum(is.na(df))
+numNA
+10000-length(which(rowSums(is.na(df))==0))
+#First, we can explore the pattern of missing data
+aggr_plot <- aggr(df, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(data), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"), main="plot of NA pattern")
+```
+	
+Yes, there is a lot of missing data about 13,918 cells of missing data and about 5451 rows of data that have NA terms. Since there was so many NAs I decided to implement MICE in order to fill in the NAs based on a weighted algorithm. 
+
+Based on the plot I produced in R, we can see that age and BMI are the variables that have the most NAs. We can infer from the plot and the data that certain NAs are clustered and this may be because of the fields that were required based on the Province. Seeing that the responses were sampled across Provinces, there may have been different required fields based on the Province. 
+
+## 4) How are you going to decide which variables to use. Note that only the prediction accuracy matters (lowest deviance/AIC/BIC)?	
+Since we only care about the prediction accuracy, I decided to use LASSO as my variable selection technique. This is because LASSO is used primarily as a variable selection tool or for making predictions where interval estimates are not required. 
+ 
+## 5) Describe your final model. How well does it fit the response?	Are there any possible colliinearity / VIF issues? How much better/worse is the model when the arthritis variable CCCA_051 is in it?
+From LASSO we have the following output: 
+
+
+```{r}
+
+
+## LASSO 
+yy <- as.matrix(newdf[,1])
+xx <- as.matrix(newdf[,2:20])
+
+
+x_train <- model.matrix( ~ .-1, newdf[,2:20])
+
+
+lm = cv.glmnet(x=x_train,y = as.factor(newdf$HeartDisease), intercept=FALSE ,family =   "binomial", alpha=1, nfolds=7)
+best_lambda <- lm$lambda[which.min(lm$cvm)]
+
+# Default plot method for cv.lambda() produces CV errors +/- 1 SE at each lambda.
+plot(lm)
+
+
+##finding the probabilities associated with each row(person)
+predict.las <- predict(lm, newx = x_train, type ="response")
+
+#printing out the first 15 probabilties of heart disease 
+head(round(predict.las,digits= 3),n=15)
+
+
+#plotting the probabilities for heart disease per person
+plot(predict.las, type="p", main = "Plot of Predictions for heart disease per person",xlab="row/person", ylab="probability of heart disease")
+
+
+##calculating the prediciton accuracy of model probabilities
+accuracy <- mean(rep(0, length(newdf$HeartDisease)) == ifelse(newdf$HeartDisease == "NO", 0, 1))
+accuracy 
+
+```
+
+I have presented the probabilites of heart disease per row(per person) above. My model has a prediction accuracy of about 94.08%. 
+Below we will show the full LASSO model with and without the arthritis variable. 
+$H_0$: coefficient for the arthritis variable is 0. 
+$H_a$: coefficient for the arthritis variable not 0. 
+
+```{r}
+
+Ho<-glm(formula=newdf$HeartDisease ~ 1, family=binomial(link=logit), data=newdf )
+Ha<-glm(formula=newdf$HeartDisease ~ arthritis_or_rheumatism, family=binomial(link=logit), data=newdf )
+
+anova(Ho,Ha, test ="Chisq")
+
+```
+
+We see based on the output produced above that the p-value is significant, thus we reject the null hypotheisis and conclude that the arthiritis variable is an explanatory variable for heart disease thus the model would be a better fit if we include this variable.
 
 
